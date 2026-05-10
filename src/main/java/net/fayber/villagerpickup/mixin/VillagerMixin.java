@@ -45,7 +45,7 @@ public abstract class VillagerMixin {
                 return;
             }
 
-            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager...");
+            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager with proper lines...");
 
             try {
                 // 1. Create Egg
@@ -61,11 +61,19 @@ public abstract class VillagerMixin {
                 // 3. Lore Generation
                 List<Component> loreLines = new ArrayList<>();
                 VillagerData vData = villager.getVillagerData();
-                String prof = vData.profession().toString().replace("minecraft:", "");
                 
-                loreLines.add(Component.literal("Job: " + prof.substring(0, 1).toUpperCase() + prof.substring(1))
-                        .withStyle(ChatFormatting.GOLD));
-                loreLines.add(Component.literal("Level: " + vData.level()).withStyle(ChatFormatting.YELLOW));
+                // Get professional name reliably from ResourceKey/Identifier
+                String profPath = vData.profession().unwrapKey()
+                    .map(key -> key.identifier().getPath())
+                    .orElse("none");
+                
+                String profName = profPath.substring(0, 1).toUpperCase() + profPath.substring(1);
+                
+                loreLines.add(Component.literal("Job: ").withStyle(ChatFormatting.GOLD)
+                    .append(Component.literal(profName).withStyle(ChatFormatting.WHITE)));
+                
+                loreLines.add(Component.literal("Level: ").withStyle(ChatFormatting.YELLOW)
+                    .append(Component.literal(String.valueOf(vData.level())).withStyle(ChatFormatting.WHITE)));
                 
                 // Station/Bed info
                 villager.getBrain().getMemory(MemoryModuleType.JOB_SITE).ifPresent(pos -> 
@@ -75,16 +83,17 @@ public abstract class VillagerMixin {
                 
                 // Trades info
                 MerchantOffers offers = villager.getOffers();
-                loreLines.add(Component.literal("Trades: " + offers.size()).withStyle(ChatFormatting.GREEN));
+                loreLines.add(Component.literal("Trades: ").withStyle(ChatFormatting.GREEN)
+                    .append(Component.literal(String.valueOf(offers.size())).withStyle(ChatFormatting.WHITE)));
                 
-                if (prof.equals("librarian")) {
+                if (profPath.equals("librarian")) {
                     for (MerchantOffer offer : offers) {
                         ItemStack result = offer.getResult();
                         if (result.is(Items.ENCHANTED_BOOK)) {
                             ItemEnchantments enchants = result.get(DataComponents.STORED_ENCHANTMENTS);
                             if (enchants != null) {
                                 for (var entry : enchants.entrySet()) {
-                                    loreLines.add(Component.literal("- ")
+                                    loreLines.add(Component.literal(" - ")
                                         .append(Enchantment.getFullname(entry.getKey(), entry.getIntValue()))
                                         .withStyle(ChatFormatting.AQUA));
                                 }
@@ -93,6 +102,7 @@ public abstract class VillagerMixin {
                     }
                 }
                 
+                // Set ItemLore with distinct lines
                 egg.set(DataComponents.LORE, new ItemLore(loreLines));
                 
                 // 4. Give Item
