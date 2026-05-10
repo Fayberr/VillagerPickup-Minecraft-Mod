@@ -45,7 +45,7 @@ public abstract class VillagerMixin {
                 return;
             }
 
-            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager and formatting lore...");
+            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager and wiping position data...");
 
             try {
                 // 1. Create Egg
@@ -56,37 +56,36 @@ public abstract class VillagerMixin {
                 villager.saveWithoutId(out);
                 CompoundTag nbt = out.buildResult();
                 
+                // MANDATORY: Remove coordinates and dimension to ensure they spawn at the player's click location
+                nbt.remove("Pos");
+                nbt.remove("Motion");
+                nbt.remove("Rotation");
+                nbt.remove("UUID");
+                nbt.remove("Dimension");
+                nbt.remove("WorldUUIDLeast");
+                nbt.remove("WorldUUIDMost");
+                
                 egg.set(DataComponents.ENTITY_DATA, TypedEntityData.of(EntityType.VILLAGER, nbt));
                 
                 // 3. Lore Generation
                 List<Component> loreLines = new ArrayList<>();
                 VillagerData vData = villager.getVillagerData();
-                
-                // Get professional name reliably
-                String profPath = vData.profession().unwrapKey()
-                    .map(key -> key.identifier().getPath())
-                    .orElse("none");
-                
+                String profPath = vData.profession().unwrapKey().map(key -> key.identifier().getPath()).orElse("none");
                 String profName = profPath.substring(0, 1).toUpperCase() + profPath.substring(1);
                 
-                // Use .withStyle(ChatFormatting.ITALIC, false) to remove cursiveness
                 loreLines.add(Component.literal("Job: ").withStyle(ChatFormatting.GOLD).withStyle(s -> s.withItalic(false))
                     .append(Component.literal(profName).withStyle(ChatFormatting.WHITE).withStyle(s -> s.withItalic(false))));
                 
                 int level = vData.level();
-                String levelStr = String.valueOf(level);
-                if (level >= 5) levelStr += " (MAX)";
-                
+                String levelStr = (level >= 5) ? level + " (MAX)" : String.valueOf(level);
                 loreLines.add(Component.literal("Level: ").withStyle(ChatFormatting.YELLOW).withStyle(s -> s.withItalic(false))
                     .append(Component.literal(levelStr).withStyle(ChatFormatting.WHITE).withStyle(s -> s.withItalic(false))));
                 
-                // Station/Bed info
                 villager.getBrain().getMemory(MemoryModuleType.JOB_SITE).ifPresent(pos -> 
                     loreLines.add(Component.literal("Has Workstation: Yes").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))));
                 villager.getBrain().getMemory(MemoryModuleType.HOME).ifPresent(pos -> 
                     loreLines.add(Component.literal("Has Bed: Yes").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))));
                 
-                // Trades info
                 MerchantOffers offers = villager.getOffers();
                 loreLines.add(Component.literal("Trades: ").withStyle(ChatFormatting.GREEN).withStyle(s -> s.withItalic(false))
                     .append(Component.literal(String.valueOf(offers.size())).withStyle(ChatFormatting.WHITE).withStyle(s -> s.withItalic(false))));
