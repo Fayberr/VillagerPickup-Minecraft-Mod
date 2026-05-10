@@ -31,9 +31,11 @@ public abstract class VillagerEntityMixin {
 
     @Inject(method = "interactMob", at = @At("HEAD"), cancellable = true)
     private void onInteractMob(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
-        VillagerEntity villager = (VillagerEntity) (Object) this;
-        if (!villager.getWorld().isClient() && hand == Hand.MAIN_HAND && player.isSneaking()) {
+        if (player.getWorld() != null && !player.getWorld().isClient() && hand == Hand.MAIN_HAND && player.isSneaking()) {
+            VillagerEntity villager = (VillagerEntity) (Object) this;
             
+            System.out.println("[VillagerPickup] SUCCESS: Intercepted interaction with " + villager.getName().getString());
+
             ItemStack egg = Items.VILLAGER_SPAWN_EGG.getDefaultStack();
             
             NbtCompound nbt = new NbtCompound();
@@ -103,7 +105,7 @@ public abstract class VillagerEntityMixin {
             }
             
             villager.discard();
-            villager.getWorld().playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
+            player.getWorld().playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
             
             cir.setReturnValue(ActionResult.SUCCESS);
         }
