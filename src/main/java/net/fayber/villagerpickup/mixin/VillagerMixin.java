@@ -5,6 +5,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.ProblemReporter;
@@ -21,6 +22,7 @@ import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.item.component.TypedEntityData;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.item.trading.ItemCost;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.storage.TagValueOutput;
@@ -31,6 +33,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Mixin(value = Villager.class, priority = 10000)
 public abstract class VillagerMixin {
@@ -45,29 +48,23 @@ public abstract class VillagerMixin {
                 return;
             }
 
-            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager and wiping position data...");
+            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager with detailed trades...");
 
             try {
-                // 1. Create Egg
                 ItemStack egg = Items.VILLAGER_SPAWN_EGG.getDefaultInstance();
                 
-                // 2. Extract Data
                 TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, player.level().registryAccess());
                 villager.saveWithoutId(out);
                 CompoundTag nbt = out.buildResult();
                 
-                // MANDATORY: Remove coordinates and dimension to ensure they spawn at the player's click location
                 nbt.remove("Pos");
                 nbt.remove("Motion");
                 nbt.remove("Rotation");
                 nbt.remove("UUID");
                 nbt.remove("Dimension");
-                nbt.remove("WorldUUIDLeast");
-                nbt.remove("WorldUUIDMost");
                 
                 egg.set(DataComponents.ENTITY_DATA, TypedEntityData.of(EntityType.VILLAGER, nbt));
                 
-                // 3. Lore Generation
                 List<Component> loreLines = new ArrayList<>();
                 VillagerData vData = villager.getVillagerData();
                 String profPath = vData.profession().unwrapKey().map(key -> key.identifier().getPath()).orElse("none");
@@ -87,36 +84,58 @@ public abstract class VillagerMixin {
                     loreLines.add(Component.literal("Has Bed: Yes").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))));
                 
                 MerchantOffers offers = villager.getOffers();
-                loreLines.add(Component.literal("Trades: ").withStyle(ChatFormatting.GREEN).withStyle(s -> s.withItalic(false))
-                    .append(Component.literal(String.valueOf(offers.size())).withStyle(ChatFormatting.WHITE).withStyle(s -> s.withItalic(false))));
+                loreLines.add(Component.literal("Trades:").withStyle(ChatFormatting.GREEN).withStyle(s -> s.withItalic(false)));
                 
-                if (profPath.equals("librarian")) {
-                    for (MerchantOffer offer : offers) {
-                        ItemStack result = offer.getResult();
-                        if (result.is(Items.ENCHANTED_BOOK)) {
-                            ItemEnchantments enchants = result.get(DataComponents.STORED_ENCHANTMENTS);
-                            if (enchants != null) {
-                                for (var entry : enchants.entrySet()) {
-                                    loreLines.add(Component.literal(" - ").withStyle(ChatFormatting.AQUA).withStyle(s -> s.withItalic(false))
-                                        .append(Enchantment.getFullname(entry.getKey(), entry.getIntValue()).copy().withStyle(s -> s.withItalic(false))));
-                                }
-                            }
-                        }
+                for (MerchantOffer offer : offers) {
+                    MutableComponent tradeLine = Component.literal(" - ").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false));
+                    
+                    // Cost A
+                    ItemCost costA = offer.getItemCostA();
+                    tradeLine.append(Component.literal(String.valueOf(costA.count())).withStyle(ChatFormatting.WHITE));
+                    tradeLine.append(Component.literal(" "));
+                    tradeLine.append(costA.itemStack().getHoverName().copy().withStyle(ChatFormatting.WHITE));
+                    
+                    // Optional Cost B
+                    Optional<ItemCost> costB = offer.getItemCostB();
+                    if (costB.isPresent()) {
+                        tradeLine.append(Component.literal(" + ").withStyle(ChatFormatting.GRAY));
+                        tradeLine.append(Component.literal(String.valueOf(costB.get().count())).withStyle(ChatFormatting.WHITE));
+                        tradeLine.append(Component.literal(" "));
+                        tradeLine.append(costB.get().itemStack().getHoverName().copy().withStyle(ChatFormatting.WHITE));
                     }
+                    
+                    tradeLine.append(Component.literal(" -> ").withStyle(ChatFormatting.YELLOW));
+                    
+                    // Result
+                    ItemStack result = offer.getResult();
+                    tradeLine.append(Component.literal(String.valueOf(result.getCount())).withStyle(ChatFormatting.WHITE));
+                    tradeLine.append(Component.literal(" "));
+                    
+                    if (result.is(Items.ENCHANTED_BOOK)) {
+                        ItemEnchantments enchants = result.get(DataComponents.STORED_ENCHANTMENTS);
+                        if (enchants != null && !enchants.isEmpty()) {
+                            var entry = enchants.entrySet().iterator().next();
+                            tradeLine.append(Enchantment.getFullname(entry.getKey(), entry.getIntValue()).copy().withStyle(ChatFormatting.AQUA));
+                        } else {
+                            tradeLine.append(result.getHoverName().copy().withStyle(ChatFormatting.WHITE));
+                        }
+                    } else {
+                        tradeLine.append(result.getHoverName().copy().withStyle(ChatFormatting.WHITE));
+                    }
+                    
+                    loreLines.add(tradeLine.withStyle(s -> s.withItalic(false)));
                 }
                 
                 egg.set(DataComponents.LORE, new ItemLore(loreLines));
                 
-                // 4. Give Item
                 if (!player.getInventory().add(egg)) {
                     player.drop(egg, false);
                 }
                 
-                // 5. Cleanup
                 villager.discard();
                 player.level().playSound(null, player.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.PLAYERS, 1.0F, 1.0F);
                 
-                VillagerPickup.LOGGER.info("[VillagerPickup] SUCCESS.");
+                VillagerPickup.LOGGER.info("[VillagerPickup] Pickup COMPLETE.");
                 cir.setReturnValue(InteractionResult.SUCCESS);
             } catch (Exception e) {
                 VillagerPickup.LOGGER.error("[VillagerPickup] CRITICAL FAILURE:", e);
