@@ -47,10 +47,13 @@ public abstract class VillagerMixin {
                 return;
             }
 
-            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager...");
+            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager with dynamic naming...");
 
             try {
+                // 1. Create Egg
                 ItemStack egg = Items.VILLAGER_SPAWN_EGG.getDefaultInstance();
+                
+                // 2. Extract Data
                 TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, player.level().registryAccess());
                 villager.saveWithoutId(out);
                 CompoundTag nbt = out.buildResult();
@@ -61,22 +64,28 @@ public abstract class VillagerMixin {
                 nbt.remove("Dimension");
                 egg.set(DataComponents.ENTITY_DATA, TypedEntityData.of(EntityType.VILLAGER, nbt));
 
-                List<Component> loreLines = new ArrayList<>();
+                // 3. Dynamic Naming
                 VillagerData vData = villager.getVillagerData();
                 String profPath = vData.profession().unwrapKey().map(key -> key.identifier().getPath()).orElse("none");
-                String profName = profPath.substring(0, 1).toUpperCase() + profPath.substring(1);
                 
-                // NO SEPARATORS
+                if (!profPath.equals("none")) {
+                    String profName = profPath.substring(0, 1).toUpperCase() + profPath.substring(1);
+                    // Name format: "{Profession} Villager Spawn Egg"
+                    egg.set(DataComponents.CUSTOM_NAME, Component.literal(profName + " Villager Spawn Egg").withStyle(s -> s.withItalic(false)));
+                }
+
+                // 4. Lore Generation
+                List<Component> loreLines = new ArrayList<>();
+                String profNameDisplay = profPath.substring(0, 1).toUpperCase() + profPath.substring(1);
                 
                 loreLines.add(Component.literal("Profession: ").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))
-                    .append(Component.literal(profName).withStyle(ChatFormatting.GOLD).withStyle(s -> s.withItalic(false))));
+                    .append(Component.literal(profNameDisplay).withStyle(ChatFormatting.GOLD).withStyle(s -> s.withItalic(false))));
                 
                 int level = vData.level();
                 String levelStr = (level >= 5) ? level + " (MAX)" : String.valueOf(level);
                 loreLines.add(Component.literal("Level: ").withStyle(ChatFormatting.YELLOW).withStyle(s -> s.withItalic(false))
                     .append(Component.literal(levelStr).withStyle(ChatFormatting.WHITE).withStyle(s -> s.withItalic(false))));
 
-                // STATION SECTION
                 villager.getBrain().getMemory(MemoryModuleType.JOB_SITE).ifPresent(pos -> {
                     String coords = pos.pos().getX() + ", " + pos.pos().getY() + ", " + pos.pos().getZ();
                     loreLines.add(Component.literal("Workstation: ").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))
@@ -89,16 +98,13 @@ public abstract class VillagerMixin {
                         .append(Component.literal(coords).withStyle(ChatFormatting.WHITE).withStyle(s -> s.withItalic(false))));
                 });
 
-                // TRADES SECTION
                 MerchantOffers offers = villager.getOffers();
                 if (!offers.isEmpty()) {
-                    loreLines.add(Component.empty()); // Spacer
+                    loreLines.add(Component.empty());
                     loreLines.add(Component.literal("Trades:").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false)));
                     
                     for (MerchantOffer offer : offers) {
-                        // REPLACED "?" WITH "-" TO AVOID ENCODING ISSUES
                         MutableComponent tradeLine = Component.literal(" - ").withStyle(ChatFormatting.DARK_GRAY).withStyle(s -> s.withItalic(false));
-                        
                         ItemCost costA = offer.getItemCostA();
                         tradeLine.append(Component.literal(costA.count() + " " + costA.itemStack().getHoverName().getString()).withStyle(ChatFormatting.WHITE).withStyle(s -> s.withItalic(false)));
                         
