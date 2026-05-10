@@ -1,7 +1,7 @@
-﻿{
+{
   "schemaVersion": 1,
   "id": "villager_pickup",
-  "version": "${version}",
+  "version": "2.0.0",
   "name": "Villager Pickup",
   "description": "Pack a Villager into a Spawn Egg by shift-right-clicking them, preserving all trades, jobs, and levels.",
   "authors": [
@@ -18,13 +18,13 @@
       "net.fayber.villagerpickup.VillagerPickup"
     ]
   },
+  "mixins": [
+    "villager_pickup.mixins.json"
+  ],
   "depends": {
-    "fabricloader": ">=${loader_version}",
+    "fabricloader": ">=0.16.10",
     "minecraft": ">=26.1.2",
     "java": ">=25",
     "fabric-api": "*"
-  },
-  "suggests": {
-    "another-mod": "*"
   }
 }

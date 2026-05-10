@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "net.fayber.villagerpickup.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "VillagerEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
