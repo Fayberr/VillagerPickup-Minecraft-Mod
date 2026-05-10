@@ -9,6 +9,6 @@ public class VillagerPickup implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Villager Pickup Mod Initialized! Shift+Right-Click a villager to capture them.");
+        LOGGER.info("Villager Pickup Mod v2.3.0 Initialized!");
     }
 }
