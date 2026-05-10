@@ -1,4 +1,4 @@
-{
+﻿{
   "schemaVersion": 1,
   "id": "villager_pickup",
   "version": "${version}",
@@ -20,8 +20,8 @@
   },
   "depends": {
     "fabricloader": ">=${loader_version}",
-    "minecraft": "26.1.2",
-    "java": ">=21",
+    "minecraft": ">=26.1.2",
+    "java": ">=25",
     "fabric-api": "*"
   },
   "suggests": {

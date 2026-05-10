@@ -10,6 +10,7 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.item.Item;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
@@ -30,25 +31,21 @@ public class VillagerPickup implements ModInitializer {
         UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
             if (!world.isClient() && hand == Hand.MAIN_HAND && player.isSneaking() && entity instanceof VillagerEntity villager) {
                 
-                // 1. Create the spawn egg
-                ItemStack egg = new ItemStack(Items.VILLAGER_SPAWN_EGG);
+                Item eggItem = (Item) Items.VILLAGER_SPAWN_EGG;
+                ItemStack egg = new ItemStack(eggItem);
                 
-                // 2. Extract NBT
                 NbtCompound nbt = new NbtCompound();
                 villager.saveNbt(nbt);
                 
-                // Remove coordinates and UUID to avoid conflicts when respawning
                 nbt.remove("Pos");
                 nbt.remove("Motion");
                 nbt.remove("Rotation");
                 nbt.remove("UUID");
                 
-                // Ensure the ID is set so the spawn egg knows what to spawn
                 nbt.putString("id", Registries.ENTITY_TYPE.getId(EntityType.VILLAGER).toString());
                 
                 egg.set(DataComponentTypes.ENTITY_DATA, NbtComponent.of(nbt));
                 
-                // 3. Generate Lore
                 List<Text> loreLines = new ArrayList<>();
                 String job = villager.getVillagerData().getProfession().id();
                 int level = villager.getVillagerData().getLevel();
@@ -57,7 +54,6 @@ public class VillagerPickup implements ModInitializer {
                         .formatted(Formatting.GOLD));
                 loreLines.add(Text.literal("Level: " + level).formatted(Formatting.YELLOW));
                 
-                // Check for Brain memories (Workstation/Home)
                 if (nbt.contains("Brain", NbtElement.COMPOUND_TYPE)) {
                     NbtCompound brain = nbt.getCompound("Brain");
                     if (brain.contains("memories", NbtElement.COMPOUND_TYPE)) {
@@ -71,7 +67,6 @@ public class VillagerPickup implements ModInitializer {
                     }
                 }
                 
-                // Check for trades
                 if (nbt.contains("Offers", NbtElement.COMPOUND_TYPE)) {
                     NbtCompound offers = nbt.getCompound("Offers");
                     if (offers.contains("Recipes", NbtElement.LIST_TYPE)) {
@@ -102,7 +97,6 @@ public class VillagerPickup implements ModInitializer {
                 
                 egg.set(DataComponentTypes.LORE, new LoreComponent(loreLines));
                 
-                // 4. Give Egg to Player & Discard Villager
                 if (!player.getInventory().insertStack(egg)) {
                     player.dropItem(egg, false);
                 }
