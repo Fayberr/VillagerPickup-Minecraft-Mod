@@ -47,7 +47,7 @@ public abstract class VillagerMixin {
                 return;
             }
 
-            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager and fixing entity naming...");
+            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager and resetting name to default...");
 
             try {
                 // 1. Create Egg
@@ -64,22 +64,14 @@ public abstract class VillagerMixin {
                 nbt.remove("Dimension");
                 egg.set(DataComponents.ENTITY_DATA, TypedEntityData.of(EntityType.VILLAGER, nbt));
 
-                // 3. Dynamic Naming (Using ITEM_NAME to avoid passing it to the entity as a nametag)
+                // 3. Lore Generation
+                List<Component> loreLines = new ArrayList<>();
                 VillagerData vData = villager.getVillagerData();
                 String profPath = vData.profession().unwrapKey().map(key -> key.identifier().getPath()).orElse("none");
-                
-                if (!profPath.equals("none")) {
-                    String profName = profPath.substring(0, 1).toUpperCase() + profPath.substring(1);
-                    // Use ITEM_NAME: Changes item display but does NOT create a floating nametag on spawn
-                    egg.set(DataComponents.ITEM_NAME, Component.literal(profName + " Villager Spawn Egg").withStyle(s -> s.withItalic(false)));
-                }
-
-                // 4. Lore Generation
-                List<Component> loreLines = new ArrayList<>();
-                String profNameDisplay = profPath.substring(0, 1).toUpperCase() + profPath.substring(1);
+                String profName = profPath.substring(0, 1).toUpperCase() + profPath.substring(1);
                 
                 loreLines.add(Component.literal("Profession: ").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))
-                    .append(Component.literal(profNameDisplay).withStyle(ChatFormatting.GOLD).withStyle(s -> s.withItalic(false))));
+                    .append(Component.literal(profName).withStyle(ChatFormatting.GOLD).withStyle(s -> s.withItalic(false))));
                 
                 int level = vData.level();
                 String levelStr = (level >= 5) ? level + " (MAX)" : String.valueOf(level);
