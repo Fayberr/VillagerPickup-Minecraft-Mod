@@ -28,10 +28,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.ArrayList;
 import java.util.List;
 
-@Mixin(PlayerEntity.class)
+@Mixin(value = PlayerEntity.class, priority = 10000)
 public abstract class PlayerEntityMixin {
 
-    @Inject(method = "interact", at = @At("HEAD"), cancellable = true)
+    /*
+     * We use remap = false because the runtime (26.1.2) appears to be unobfuscated.
+     * Targeting both the standard name "interact" and any common aliases.
+     */
+    @Inject(method = "interact", at = @At("HEAD"), cancellable = true, remap = false)
     private void onInteract(Entity entity, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
         if (entity instanceof VillagerEntity villager && hand == Hand.MAIN_HAND) {
             PlayerEntity player = (PlayerEntity) (Object) this;
@@ -42,7 +46,7 @@ public abstract class PlayerEntityMixin {
                     return;
                 }
 
-                VillagerPickup.LOGGER.info("[VillagerPickup] Interaction intercepted at PlayerEntity level.");
+                VillagerPickup.LOGGER.info("[VillagerPickup] Interaction intercepted with remap=false!");
 
                 try {
                     ItemStack egg = Items.VILLAGER_SPAWN_EGG.getDefaultStack();
@@ -70,10 +74,10 @@ public abstract class PlayerEntityMixin {
                     villager.discard();
                     player.getWorld().playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
                     
-                    VillagerPickup.LOGGER.info("[VillagerPickup] Pickup SUCCESS.");
+                    VillagerPickup.LOGGER.info("[VillagerPickup] SUCCESS.");
                     cir.setReturnValue(ActionResult.SUCCESS);
                 } catch (Exception e) {
-                    VillagerPickup.LOGGER.error("[VillagerPickup] Pickup FAILED:", e);
+                    VillagerPickup.LOGGER.error("[VillagerPickup] FAILED:", e);
                 }
             }
         }
