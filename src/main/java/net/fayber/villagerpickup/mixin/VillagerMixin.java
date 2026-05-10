@@ -47,7 +47,7 @@ public abstract class VillagerMixin {
                 return;
             }
 
-            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager with dynamic naming...");
+            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager and fixing entity naming...");
 
             try {
                 // 1. Create Egg
@@ -64,14 +64,14 @@ public abstract class VillagerMixin {
                 nbt.remove("Dimension");
                 egg.set(DataComponents.ENTITY_DATA, TypedEntityData.of(EntityType.VILLAGER, nbt));
 
-                // 3. Dynamic Naming
+                // 3. Dynamic Naming (Using ITEM_NAME to avoid passing it to the entity as a nametag)
                 VillagerData vData = villager.getVillagerData();
                 String profPath = vData.profession().unwrapKey().map(key -> key.identifier().getPath()).orElse("none");
                 
                 if (!profPath.equals("none")) {
                     String profName = profPath.substring(0, 1).toUpperCase() + profPath.substring(1);
-                    // Name format: "{Profession} Villager Spawn Egg"
-                    egg.set(DataComponents.CUSTOM_NAME, Component.literal(profName + " Villager Spawn Egg").withStyle(s -> s.withItalic(false)));
+                    // Use ITEM_NAME: Changes item display but does NOT create a floating nametag on spawn
+                    egg.set(DataComponents.ITEM_NAME, Component.literal(profName + " Villager Spawn Egg").withStyle(s -> s.withItalic(false)));
                 }
 
                 // 4. Lore Generation
