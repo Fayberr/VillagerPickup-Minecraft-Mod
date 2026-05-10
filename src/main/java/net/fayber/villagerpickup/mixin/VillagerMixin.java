@@ -42,100 +42,96 @@ public abstract class VillagerMixin {
     private void onMobInteract(Player player, InteractionHand hand, CallbackInfoReturnable<InteractionResult> cir) {
         if (hand == InteractionHand.MAIN_HAND && player.isShiftKeyDown()) {
             Villager villager = (Villager) (Object) this;
-            
             if (player.level().isClientSide()) {
                 cir.setReturnValue(InteractionResult.SUCCESS);
                 return;
             }
 
-            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager with detailed trades...");
+            VillagerPickup.LOGGER.info("[VillagerPickup] Capturing villager with clean, detailed tooltip...");
 
             try {
                 ItemStack egg = Items.VILLAGER_SPAWN_EGG.getDefaultInstance();
-                
                 TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, player.level().registryAccess());
                 villager.saveWithoutId(out);
                 CompoundTag nbt = out.buildResult();
-                
                 nbt.remove("Pos");
                 nbt.remove("Motion");
                 nbt.remove("Rotation");
                 nbt.remove("UUID");
                 nbt.remove("Dimension");
-                
                 egg.set(DataComponents.ENTITY_DATA, TypedEntityData.of(EntityType.VILLAGER, nbt));
-                
+
                 List<Component> loreLines = new ArrayList<>();
                 VillagerData vData = villager.getVillagerData();
                 String profPath = vData.profession().unwrapKey().map(key -> key.identifier().getPath()).orElse("none");
                 String profName = profPath.substring(0, 1).toUpperCase() + profPath.substring(1);
                 
-                loreLines.add(Component.literal("Job: ").withStyle(ChatFormatting.GOLD).withStyle(s -> s.withItalic(false))
-                    .append(Component.literal(profName).withStyle(ChatFormatting.WHITE).withStyle(s -> s.withItalic(false))));
+                // HEADER SECTION
+                loreLines.add(Component.literal("?m-----------------------------").withStyle(ChatFormatting.DARK_GRAY).withStyle(s -> s.withItalic(false)));
+                
+                loreLines.add(Component.literal(" Profession: ").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))
+                    .append(Component.literal(profName).withStyle(ChatFormatting.GOLD)));
                 
                 int level = vData.level();
                 String levelStr = (level >= 5) ? level + " (MAX)" : String.valueOf(level);
-                loreLines.add(Component.literal("Level: ").withStyle(ChatFormatting.YELLOW).withStyle(s -> s.withItalic(false))
-                    .append(Component.literal(levelStr).withStyle(ChatFormatting.WHITE).withStyle(s -> s.withItalic(false))));
+                loreLines.add(Component.literal(" Level: ").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))
+                    .append(Component.literal(levelStr).withStyle(ChatFormatting.YELLOW)));
+
+                // STATION SECTION
+                villager.getBrain().getMemory(MemoryModuleType.JOB_SITE).ifPresent(pos -> {
+                    String coords = pos.pos().getX() + ", " + pos.pos().getY() + ", " + pos.pos().getZ();
+                    loreLines.add(Component.literal(" Workstation: ").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))
+                        .append(Component.literal(coords).withStyle(ChatFormatting.WHITE)));
+                });
                 
-                villager.getBrain().getMemory(MemoryModuleType.JOB_SITE).ifPresent(pos -> 
-                    loreLines.add(Component.literal("Has Workstation: Yes").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))));
-                villager.getBrain().getMemory(MemoryModuleType.HOME).ifPresent(pos -> 
-                    loreLines.add(Component.literal("Has Bed: Yes").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))));
-                
+                villager.getBrain().getMemory(MemoryModuleType.HOME).ifPresent(pos -> {
+                    String coords = pos.pos().getX() + ", " + pos.pos().getY() + ", " + pos.pos().getZ();
+                    loreLines.add(Component.literal(" Bed: ").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false))
+                        .append(Component.literal(coords).withStyle(ChatFormatting.WHITE)));
+                });
+
+                // TRADES SECTION
                 MerchantOffers offers = villager.getOffers();
-                loreLines.add(Component.literal("Trades:").withStyle(ChatFormatting.GREEN).withStyle(s -> s.withItalic(false)));
-                
-                for (MerchantOffer offer : offers) {
-                    MutableComponent tradeLine = Component.literal(" - ").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false));
+                if (!offers.isEmpty()) {
+                    loreLines.add(Component.literal("")); // Spacer
+                    loreLines.add(Component.literal(" Trades:").withStyle(ChatFormatting.GRAY).withStyle(s -> s.withItalic(false)));
                     
-                    // Cost A
-                    ItemCost costA = offer.getItemCostA();
-                    tradeLine.append(Component.literal(String.valueOf(costA.count())).withStyle(ChatFormatting.WHITE));
-                    tradeLine.append(Component.literal(" "));
-                    tradeLine.append(costA.itemStack().getHoverName().copy().withStyle(ChatFormatting.WHITE));
-                    
-                    // Optional Cost B
-                    Optional<ItemCost> costB = offer.getItemCostB();
-                    if (costB.isPresent()) {
-                        tradeLine.append(Component.literal(" + ").withStyle(ChatFormatting.GRAY));
-                        tradeLine.append(Component.literal(String.valueOf(costB.get().count())).withStyle(ChatFormatting.WHITE));
-                        tradeLine.append(Component.literal(" "));
-                        tradeLine.append(costB.get().itemStack().getHoverName().copy().withStyle(ChatFormatting.WHITE));
-                    }
-                    
-                    tradeLine.append(Component.literal(" -> ").withStyle(ChatFormatting.YELLOW));
-                    
-                    // Result
-                    ItemStack result = offer.getResult();
-                    tradeLine.append(Component.literal(String.valueOf(result.getCount())).withStyle(ChatFormatting.WHITE));
-                    tradeLine.append(Component.literal(" "));
-                    
-                    if (result.is(Items.ENCHANTED_BOOK)) {
-                        ItemEnchantments enchants = result.get(DataComponents.STORED_ENCHANTMENTS);
-                        if (enchants != null && !enchants.isEmpty()) {
-                            var entry = enchants.entrySet().iterator().next();
-                            tradeLine.append(Enchantment.getFullname(entry.getKey(), entry.getIntValue()).copy().withStyle(ChatFormatting.AQUA));
+                    for (MerchantOffer offer : offers) {
+                        MutableComponent tradeLine = Component.literal("  ? ").withStyle(ChatFormatting.DARK_GRAY).withStyle(s -> s.withItalic(false));
+                        
+                        ItemCost costA = offer.getItemCostA();
+                        tradeLine.append(Component.literal(costA.count() + " " + costA.itemStack().getHoverName().getString()).withStyle(ChatFormatting.WHITE));
+                        
+                        offer.getItemCostB().ifPresent(costB -> {
+                            tradeLine.append(Component.literal(" + ").withStyle(ChatFormatting.GRAY));
+                            tradeLine.append(Component.literal(costB.count() + " " + costB.itemStack().getHoverName().getString()).withStyle(ChatFormatting.WHITE));
+                        });
+                        
+                        tradeLine.append(Component.literal(" -> ").withStyle(ChatFormatting.YELLOW));
+                        
+                        ItemStack result = offer.getResult();
+                        if (result.is(Items.ENCHANTED_BOOK)) {
+                            ItemEnchantments enchants = result.get(DataComponents.STORED_ENCHANTMENTS);
+                            if (enchants != null && !enchants.isEmpty()) {
+                                var entry = enchants.entrySet().iterator().next();
+                                tradeLine.append(Enchantment.getFullname(entry.getKey(), entry.getIntValue()).copy().withStyle(ChatFormatting.AQUA));
+                            } else {
+                                tradeLine.append(result.getHoverName().copy().withStyle(ChatFormatting.WHITE));
+                            }
                         } else {
-                            tradeLine.append(result.getHoverName().copy().withStyle(ChatFormatting.WHITE));
+                            tradeLine.append(Component.literal(result.getCount() + " " + result.getHoverName().getString()).withStyle(ChatFormatting.WHITE));
                         }
-                    } else {
-                        tradeLine.append(result.getHoverName().copy().withStyle(ChatFormatting.WHITE));
+                        loreLines.add(tradeLine.withStyle(s -> s.withItalic(false)));
                     }
-                    
-                    loreLines.add(tradeLine.withStyle(s -> s.withItalic(false)));
                 }
                 
+                loreLines.add(Component.literal("?m-----------------------------").withStyle(ChatFormatting.DARK_GRAY).withStyle(s -> s.withItalic(false)));
+
                 egg.set(DataComponents.LORE, new ItemLore(loreLines));
-                
-                if (!player.getInventory().add(egg)) {
-                    player.drop(egg, false);
-                }
-                
+                if (!player.getInventory().add(egg)) player.drop(egg, false);
                 villager.discard();
                 player.level().playSound(null, player.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.PLAYERS, 1.0F, 1.0F);
                 
-                VillagerPickup.LOGGER.info("[VillagerPickup] Pickup COMPLETE.");
                 cir.setReturnValue(InteractionResult.SUCCESS);
             } catch (Exception e) {
                 VillagerPickup.LOGGER.error("[VillagerPickup] CRITICAL FAILURE:", e);
