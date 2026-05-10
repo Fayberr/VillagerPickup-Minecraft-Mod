@@ -9,6 +9,6 @@ public class VillagerPickup implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Villager Pickup Mod v2.3.0 Initialized!");
+        LOGGER.info("Villager Pickup v2.5.0 (OFFICIAL) Initialized!");
     }
 }
