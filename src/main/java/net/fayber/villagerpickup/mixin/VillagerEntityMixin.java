@@ -31,89 +31,55 @@ public abstract class VillagerEntityMixin {
 
     @Inject(method = "interactMob", at = @At("HEAD"), cancellable = true)
     private void onInteractMob(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
+        // ALWAYS LOG THE ATTEMPT
+        System.out.println("[VillagerPickup] Interaction attempt: Hand=" + hand + ", Sneaking=" + player.isSneaking() + ", Side=" + (player.getWorld().isClient() ? "CLIENT" : "SERVER"));
+
         if (hand == Hand.MAIN_HAND && player.isSneaking()) {
             VillagerEntity villager = (VillagerEntity) (Object) this;
             
-            // Client side just cancels to prevent UI opening
+            System.out.println("[VillagerPickup] Conditions met! Processing pickup for: " + villager.getName().getString());
+            
             if (player.getWorld().isClient()) {
+                System.out.println("[VillagerPickup] Client-side: Cancelling vanilla interaction.");
                 cir.setReturnValue(ActionResult.SUCCESS);
                 return;
             }
             
-            System.out.println("[VillagerPickup] SUCCESS: Intercepted interaction with " + villager.getName().getString());
+            System.out.println("[VillagerPickup] Server-side: Creating spawn egg...");
 
-            ItemStack egg = Items.VILLAGER_SPAWN_EGG.getDefaultStack();
-            
-            NbtCompound nbt = new NbtCompound();
-            villager.saveNbt(nbt);
-            
-            nbt.remove("Pos");
-            nbt.remove("Motion");
-            nbt.remove("Rotation");
-            nbt.remove("UUID");
-            nbt.putString("id", Registries.ENTITY_TYPE.getId(EntityType.VILLAGER).toString());
-            
-            egg.set(DataComponentTypes.ENTITY_DATA, NbtComponent.of(nbt));
-            
-            List<Text> loreLines = new ArrayList<>();
-            String job = villager.getVillagerData().getProfession().id();
-            int level = villager.getVillagerData().getLevel();
-            
-            loreLines.add(Text.literal("Job: " + job.substring(0, 1).toUpperCase() + job.substring(1))
-                    .formatted(Formatting.GOLD));
-            loreLines.add(Text.literal("Level: " + level).formatted(Formatting.YELLOW));
-            
-            if (nbt.contains("Brain", NbtElement.COMPOUND_TYPE)) {
-                NbtCompound brain = nbt.getCompound("Brain");
-                if (brain.contains("memories", NbtElement.COMPOUND_TYPE)) {
-                    NbtCompound memories = brain.getCompound("memories");
-                    if (memories.contains("minecraft:job_site")) {
-                        loreLines.add(Text.literal("Has Workstation: Yes").formatted(Formatting.GRAY));
-                    }
-                    if (memories.contains("minecraft:home")) {
-                        loreLines.add(Text.literal("Has Bed: Yes").formatted(Formatting.GRAY));
-                    }
+            try {
+                ItemStack egg = Items.VILLAGER_SPAWN_EGG.getDefaultStack();
+                
+                NbtCompound nbt = new NbtCompound();
+                villager.saveNbt(nbt);
+                
+                nbt.remove("Pos");
+                nbt.remove("Motion");
+                nbt.remove("Rotation");
+                nbt.remove("UUID");
+                nbt.putString("id", Registries.ENTITY_TYPE.getId(EntityType.VILLAGER).toString());
+                
+                egg.set(DataComponentTypes.ENTITY_DATA, NbtComponent.of(nbt));
+                
+                // Lore Generation
+                List<Text> loreLines = new ArrayList<>();
+                String job = villager.getVillagerData().getProfession().id();
+                loreLines.add(Text.literal("Job: " + job).formatted(Formatting.GOLD));
+                egg.set(DataComponentTypes.LORE, new LoreComponent(loreLines));
+                
+                if (!player.getInventory().insertStack(egg)) {
+                    player.dropItem(egg, false);
                 }
+                
+                villager.discard();
+                player.getWorld().playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
+                
+                System.out.println("[VillagerPickup] Server-side: Pickup COMPLETE.");
+                cir.setReturnValue(ActionResult.SUCCESS);
+            } catch (Exception e) {
+                System.err.println("[VillagerPickup] CRITICAL ERROR during pickup:");
+                e.printStackTrace();
             }
-            
-            if (nbt.contains("Offers", NbtElement.COMPOUND_TYPE)) {
-                NbtCompound offers = nbt.getCompound("Offers");
-                if (offers.contains("Recipes", NbtElement.LIST_TYPE)) {
-                    NbtList recipes = offers.getList("Recipes", NbtElement.COMPOUND_TYPE);
-                    loreLines.add(Text.literal("Trades: " + recipes.size()).formatted(Formatting.GREEN));
-                    
-                    if (job.equals("librarian")) {
-                        for (int i = 0; i < recipes.size(); i++) {
-                            NbtCompound recipe = recipes.getCompound(i);
-                            NbtCompound sellItem = recipe.getCompound("sell");
-                            if (sellItem.getString("id").equals("minecraft:enchanted_book")) {
-                                if (sellItem.contains("components", NbtElement.COMPOUND_TYPE)) {
-                                    NbtCompound components = sellItem.getCompound("components");
-                                    if (components.contains("minecraft:stored_enchantments", NbtElement.COMPOUND_TYPE)) {
-                                        NbtCompound enchantments = components.getCompound("minecraft:stored_enchantments");
-                                        for (String key : enchantments.getKeys()) {
-                                            int enchLvl = enchantments.getInt(key);
-                                            String enchName = key.replace("minecraft:", "").replace("_", " ");
-                                            loreLines.add(Text.literal("- " + enchName + " " + enchLvl).formatted(Formatting.AQUA));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            egg.set(DataComponentTypes.LORE, new LoreComponent(loreLines));
-            
-            if (!player.getInventory().insertStack(egg)) {
-                player.dropItem(egg, false);
-            }
-            
-            villager.discard();
-            player.getWorld().playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
-            
-            cir.setReturnValue(ActionResult.SUCCESS);
         }
     }
 }
