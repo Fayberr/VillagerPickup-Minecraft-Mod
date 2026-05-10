@@ -26,13 +26,19 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.ArrayList;
 import java.util.List;
 
-@Mixin(VillagerEntity.class)
+@Mixin(value = VillagerEntity.class, priority = 9999)
 public abstract class VillagerEntityMixin {
 
     @Inject(method = "interactMob", at = @At("HEAD"), cancellable = true)
     private void onInteractMob(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
-        if (player.getWorld() != null && !player.getWorld().isClient() && hand == Hand.MAIN_HAND && player.isSneaking()) {
+        if (hand == Hand.MAIN_HAND && player.isSneaking()) {
             VillagerEntity villager = (VillagerEntity) (Object) this;
+            
+            // Client side just cancels to prevent UI opening
+            if (player.getWorld().isClient()) {
+                cir.setReturnValue(ActionResult.SUCCESS);
+                return;
+            }
             
             System.out.println("[VillagerPickup] SUCCESS: Intercepted interaction with " + villager.getName().getString());
 
