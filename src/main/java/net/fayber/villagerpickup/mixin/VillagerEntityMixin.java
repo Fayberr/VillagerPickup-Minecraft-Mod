@@ -1,5 +1,6 @@
 package net.fayber.villagerpickup.mixin;
 
+import net.fayber.villagerpickup.VillagerPickup;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.LoreComponent;
 import net.minecraft.component.type.NbtComponent;
@@ -31,21 +32,19 @@ public abstract class VillagerEntityMixin {
 
     @Inject(method = "interactMob", at = @At("HEAD"), cancellable = true)
     private void onInteractMob(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
-        // ALWAYS LOG THE ATTEMPT
-        System.out.println("[VillagerPickup] Interaction attempt: Hand=" + hand + ", Sneaking=" + player.isSneaking() + ", Side=" + (player.getWorld().isClient() ? "CLIENT" : "SERVER"));
+        // Log every right-click on a villager for debugging
+        VillagerPickup.LOGGER.debug("Villager interact attempt: hand={}, sneaking={}, client={}", hand, player.isSneaking(), player.getWorld().isClient());
 
         if (hand == Hand.MAIN_HAND && player.isSneaking()) {
             VillagerEntity villager = (VillagerEntity) (Object) this;
             
-            System.out.println("[VillagerPickup] Conditions met! Processing pickup for: " + villager.getName().getString());
-            
             if (player.getWorld().isClient()) {
-                System.out.println("[VillagerPickup] Client-side: Cancelling vanilla interaction.");
+                // Return success on client to prevent trade UI opening
                 cir.setReturnValue(ActionResult.SUCCESS);
                 return;
             }
             
-            System.out.println("[VillagerPickup] Server-side: Creating spawn egg...");
+            VillagerPickup.LOGGER.info("Capturing villager: {}", villager.getName().getString());
 
             try {
                 ItemStack egg = Items.VILLAGER_SPAWN_EGG.getDefaultStack();
@@ -61,7 +60,6 @@ public abstract class VillagerEntityMixin {
                 
                 egg.set(DataComponentTypes.ENTITY_DATA, NbtComponent.of(nbt));
                 
-                // Lore Generation
                 List<Text> loreLines = new ArrayList<>();
                 String job = villager.getVillagerData().getProfession().id();
                 loreLines.add(Text.literal("Job: " + job).formatted(Formatting.GOLD));
@@ -74,11 +72,10 @@ public abstract class VillagerEntityMixin {
                 villager.discard();
                 player.getWorld().playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
                 
-                System.out.println("[VillagerPickup] Server-side: Pickup COMPLETE.");
+                VillagerPickup.LOGGER.info("Successfully captured villager!");
                 cir.setReturnValue(ActionResult.SUCCESS);
             } catch (Exception e) {
-                System.err.println("[VillagerPickup] CRITICAL ERROR during pickup:");
-                e.printStackTrace();
+                VillagerPickup.LOGGER.error("CRITICAL ERROR during villager pickup:", e);
             }
         }
     }
