@@ -3,7 +3,8 @@
   "package": "net.fayber.villagerpickup.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "VillagerMixin"
+    "VillagerMixin",
+    "SpawnEggItemMixin"
   ],
   "injectors": {
     "defaultRequire": 1

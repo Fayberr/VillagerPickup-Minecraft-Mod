@@ -1,9 +1,9 @@
-{
+﻿{
   "schemaVersion": 1,
   "id": "villager_pickup",
   "version": "${version}",
   "name": "Villager Pickup",
-  "description": "Pack a Villager into a Spawn Egg by shift-right-clicking them, preserving all trades, jobs, and levels.",
+  "description": "Allows players to pick up villagers by shift-right-clicking them.",
   "authors": [
     "Fayber"
   ],
@@ -23,7 +23,7 @@
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",
-    "minecraft": "1.21.10",
+    "minecraft": "~${minecraft_version}",
     "java": ">=21",
     "fabric-api": "*"
   }
