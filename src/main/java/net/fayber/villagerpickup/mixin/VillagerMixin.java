@@ -37,6 +37,15 @@ public abstract class VillagerMixin {
 
     @Inject(method = "interactMob", at = @At("HEAD"), cancellable = true)
     private void onInteractMob(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
+        ItemStack stackInHand = player.getStackInHand(hand);
+        
+        // Prevent baby spawning if using a custom spawn egg
+        if (stackInHand.isOf(Items.VILLAGER_SPAWN_EGG) && stackInHand.contains(DataComponentTypes.ENTITY_DATA)) {
+            // Let it pass so it can be used on the block behind the villager or nothing happens
+            cir.setReturnValue(ActionResult.PASS);
+            return;
+        }
+
         if (hand == Hand.MAIN_HAND && player.isSneaking()) {
             VillagerEntity villager = (VillagerEntity) (Object) this;
             
@@ -125,6 +134,10 @@ public abstract class VillagerMixin {
                 }
                 
                 egg.set(DataComponentTypes.LORE, new LoreComponent(loreLines));
+
+                if (villager.isBaby()) {
+                    egg.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Baby Villager Spawn Egg").styled(s -> s.withItalic(false)));
+                }
                 
                 if (!player.getInventory().insertStack(egg)) {
                     player.dropItem(egg, false);
