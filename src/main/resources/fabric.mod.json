@@ -11,6 +11,7 @@
     "homepage": "https://fabricmc.net/"
   },
   "license": "GPL-3.0-or-later",
+  "icon": "assets/villager_pickup/icon.png",
   "environment": "*",
   "entrypoints": {
     "main": [
