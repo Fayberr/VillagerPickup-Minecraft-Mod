@@ -35,10 +35,18 @@ import java.util.List;
 public class VillagerPickup implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("villager_pickup");
 
+    private boolean isTrapped(ItemStack stack) {
+        if (!stack.isOf(Items.VILLAGER_SPAWN_EGG)) return false;
+        TypedEntityData<?> data = stack.get(DataComponentTypes.ENTITY_DATA);
+        if (data == null) return false;
+        // Hacky but robust for 1.21: check string representation for the marker
+        return data.toString().contains("VillagerPickupMarker");
+    }
+
     private String getHandDescription(ItemStack stack) {
         if (stack.isEmpty()) return "empty hand";
         if (stack.isOf(Items.VILLAGER_SPAWN_EGG)) {
-            if (stack.contains(DataComponentTypes.ENTITY_DATA)) return "trapped villager in hand";
+            if (isTrapped(stack)) return "trapped villager in hand";
             return "vanilla spawn egg in hand";
         }
         return stack.getItem().toString() + " in hand";
@@ -46,21 +54,20 @@ public class VillagerPickup implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Villager Pickup v4.0.9 Initialized with VERBOSE LOGGING!");
+        LOGGER.info("Villager Pickup v4.1.0 Initialized with VERBOSE LOGGING!");
 
-        // 1. Interacting with another entity (Villager)
         UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
             if (player.isSpectator()) return ActionResult.PASS;
             if (!(entity instanceof VillagerEntity villager)) return ActionResult.PASS;
-            if (hand != Hand.MAIN_HAND) return ActionResult.PASS; // Avoid double logging
+            if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
 
             ItemStack stack = player.getStackInHand(hand);
             String handDesc = getHandDescription(stack);
+            boolean trapped = isTrapped(stack);
 
             if (world.isClient()) {
-                // Client prediction to keep hand swing smooth
                 if (player.isSneaking()) return ActionResult.SUCCESS;
-                if (!player.isSneaking() && stack.isOf(Items.VILLAGER_SPAWN_EGG) && stack.contains(DataComponentTypes.ENTITY_DATA)) return ActionResult.SUCCESS;
+                if (!player.isSneaking() && trapped) return ActionResult.SUCCESS;
                 return ActionResult.PASS;
             }
 
@@ -72,7 +79,6 @@ public class VillagerPickup implements ModInitializer {
             if (player.isSneaking()) {
                 LOGGER.info("[VillagerPickup-Verbose] Action: Trying to capture with {}", handDesc);
                 try {
-                    // Create Egg
                     ItemStack egg = Items.VILLAGER_SPAWN_EGG.getDefaultStack();
 
                     if (villager.isBaby()) {
@@ -82,7 +88,6 @@ public class VillagerPickup implements ModInitializer {
                         LOGGER.info("[VillagerPickup-Verbose] Target Villager is an ADULT.");
                     }
 
-                    // Extract Data
                     NbtWriteView writeView = NbtWriteView.create(ErrorReporter.EMPTY, world.getRegistryManager());
                     villager.writeData(writeView);
                     NbtCompound nbt = writeView.getNbt();
@@ -92,10 +97,11 @@ public class VillagerPickup implements ModInitializer {
                     nbt.remove("Rotation");
                     nbt.remove("UUID");
                     nbt.remove("Dimension");
+                    
+                    nbt.putBoolean("VillagerPickupMarker", true);
 
                     egg.set(DataComponentTypes.ENTITY_DATA, TypedEntityData.create(EntityType.VILLAGER, nbt));
 
-                    // Lore Generation
                     List<Text> loreLines = new ArrayList<>();
                     VillagerData vData = villager.getVillagerData();
                     String profId = vData.profession().getKey().map(key -> key.getValue().getPath()).orElse("none");
@@ -167,15 +173,18 @@ public class VillagerPickup implements ModInitializer {
             }
 
             // B) NOT SNEAKING -> RELEASE (TRAPPED ONLY)
-            if (!player.isSneaking() && stack.isOf(Items.VILLAGER_SPAWN_EGG) && stack.contains(DataComponentTypes.ENTITY_DATA)) {
-                LOGGER.info("[VillagerPickup-Verbose] Action: Releasing Villager against another Villager.");
+            if (!player.isSneaking() && trapped) {
+                LOGGER.info("[VillagerPickup-Verbose] Action: Releasing Trapped Villager against another Villager.");
                 
                 SpawnReason reason = SpawnReason.SPAWNER;
                 try { reason = SpawnReason.valueOf("SPAWN_EGG"); } catch (Exception ignored) {}
                 
-                var spawned = EntityType.VILLAGER.spawnFromItemStack((ServerWorld) world, stack, player, villager.getBlockPos(), reason, true, false);
+                ItemStack stackToSpawn = stack.copy();
+                stackToSpawn.remove(DataComponentTypes.CUSTOM_NAME);
+                
+                var spawned = EntityType.VILLAGER.spawnFromItemStack((ServerWorld) world, stackToSpawn, player, villager.getBlockPos(), reason, true, false);
                 if (spawned != null) {
-                    LOGGER.info("[VillagerPickup-Verbose] Result: Successfully released TRAPPED villager (Adult).");
+                    LOGGER.info("[VillagerPickup-Verbose] Result: Successfully released TRAPPED villager.");
                     if (!player.getAbilities().creativeMode) {
                         stack.decrement(1);
                     }
@@ -185,30 +194,33 @@ public class VillagerPickup implements ModInitializer {
                 }
             }
 
-            // C) FALLTHROUGH
-            if (!player.isSneaking() && stack.isOf(Items.VILLAGER_SPAWN_EGG) && !stack.contains(DataComponentTypes.ENTITY_DATA)) {
-                LOGGER.info("[VillagerPickup-Verbose] Action: Vanilla spawn egg detected. Returning PASS to let vanilla spawn a baby.");
-                return ActionResult.PASS;
-            }
-
-            LOGGER.info("[VillagerPickup-Verbose] Action: No custom logic applied. Returning PASS.");
+            LOGGER.info("[VillagerPickup-Verbose] Action: No custom logic applied (Pass to Vanilla).");
             return ActionResult.PASS;
         });
 
-        // Block interaction logging (Open Space)
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
             if (world.isClient()) return ActionResult.PASS;
             if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
 
             ItemStack stack = player.getStackInHand(hand);
-            if (stack.isOf(Items.VILLAGER_SPAWN_EGG)) {
-                if (stack.contains(DataComponentTypes.ENTITY_DATA)) {
-                    LOGGER.info("[VillagerPickup-Verbose] --- UseBlockCallback Triggered ---");
-                    LOGGER.info("[VillagerPickup-Verbose] Action: Releasing Villager on open Space (Block: {}).", hitResult.getBlockPos());
-                    LOGGER.info("[VillagerPickup-Verbose] Letting vanilla SpawnEggItem logic handle the actual spawn process.");
-                } else {
-                    // It's a vanilla egg on a block.
-                    // LOGGER.info("[VillagerPickup-Verbose] Vanilla spawn egg used on block. Ignoring.");
+            if (isTrapped(stack)) {
+                LOGGER.info("[VillagerPickup-Verbose] --- UseBlockCallback Triggered ---");
+                LOGGER.info("[VillagerPickup-Verbose] Action: Releasing Trapped Villager on open Space (Block: {}).", hitResult.getBlockPos());
+                
+                if (world instanceof ServerWorld serverWorld) {
+                    SpawnReason reason = SpawnReason.SPAWNER;
+                    try { reason = SpawnReason.valueOf("SPAWN_EGG"); } catch (Exception ignored) {}
+                    
+                    ItemStack stackToSpawn = stack.copy();
+                    stackToSpawn.remove(DataComponentTypes.CUSTOM_NAME);
+                    
+                    var spawned = EntityType.VILLAGER.spawnFromItemStack(serverWorld, stackToSpawn, player, hitResult.getBlockPos().offset(hitResult.getSide()), reason, true, false);
+                    if (spawned != null) {
+                        if (!player.getAbilities().creativeMode) {
+                            stack.decrement(1);
+                        }
+                        return ActionResult.SUCCESS;
+                    }
                 }
             }
 
