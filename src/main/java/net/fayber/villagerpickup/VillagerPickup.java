@@ -39,22 +39,12 @@ public class VillagerPickup implements ModInitializer {
         if (!stack.isOf(Items.VILLAGER_SPAWN_EGG)) return false;
         TypedEntityData<?> data = stack.get(DataComponentTypes.ENTITY_DATA);
         if (data == null) return false;
-        // Hacky but robust for 1.21: check string representation for the marker
         return data.toString().contains("VillagerPickupMarker");
-    }
-
-    private String getHandDescription(ItemStack stack) {
-        if (stack.isEmpty()) return "empty hand";
-        if (stack.isOf(Items.VILLAGER_SPAWN_EGG)) {
-            if (isTrapped(stack)) return "trapped villager in hand";
-            return "vanilla spawn egg in hand";
-        }
-        return stack.getItem().toString() + " in hand";
     }
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Villager Pickup v4.1.0 Initialized with VERBOSE LOGGING!");
+        LOGGER.info("Villager Pickup v4.6.0 Initialized!");
 
         UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
             if (player.isSpectator()) return ActionResult.PASS;
@@ -62,7 +52,6 @@ public class VillagerPickup implements ModInitializer {
             if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
 
             ItemStack stack = player.getStackInHand(hand);
-            String handDesc = getHandDescription(stack);
             boolean trapped = isTrapped(stack);
 
             if (world.isClient()) {
@@ -71,21 +60,13 @@ public class VillagerPickup implements ModInitializer {
                 return ActionResult.PASS;
             }
 
-            LOGGER.info("[VillagerPickup-Verbose] --- UseEntityCallback Triggered ---");
-            LOGGER.info("[VillagerPickup-Verbose] Sneaking: {}", player.isSneaking());
-            LOGGER.info("[VillagerPickup-Verbose] Holding: {}", handDesc);
-
             // A) SNEAKING -> CAPTURE
             if (player.isSneaking()) {
-                LOGGER.info("[VillagerPickup-Verbose] Action: Trying to capture with {}", handDesc);
                 try {
                     ItemStack egg = Items.VILLAGER_SPAWN_EGG.getDefaultStack();
 
                     if (villager.isBaby()) {
                         egg.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Baby Villager Spawn Egg").formatted(Formatting.WHITE).styled(s -> s.withItalic(false)));
-                        LOGGER.info("[VillagerPickup-Verbose] Target Villager is a BABY.");
-                    } else {
-                        LOGGER.info("[VillagerPickup-Verbose] Target Villager is an ADULT.");
                     }
 
                     NbtWriteView writeView = NbtWriteView.create(ErrorReporter.EMPTY, world.getRegistryManager());
@@ -97,7 +78,6 @@ public class VillagerPickup implements ModInitializer {
                     nbt.remove("Rotation");
                     nbt.remove("UUID");
                     nbt.remove("Dimension");
-                    
                     nbt.putBoolean("VillagerPickupMarker", true);
 
                     egg.set(DataComponentTypes.ENTITY_DATA, TypedEntityData.create(EntityType.VILLAGER, nbt));
@@ -165,17 +145,14 @@ public class VillagerPickup implements ModInitializer {
                     villager.discard();
                     world.playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
 
-                    LOGGER.info("[VillagerPickup-Verbose] Result: Capture SUCCESSFUL!");
                     return ActionResult.SUCCESS;
                 } catch (Exception e) {
-                    LOGGER.error("[VillagerPickup-Verbose] Result: Capture FAILED with exception:", e);
+                    LOGGER.error("[VillagerPickup] Capture FAILED:", e);
                 }
             }
 
             // B) NOT SNEAKING -> RELEASE (TRAPPED ONLY)
             if (!player.isSneaking() && trapped) {
-                LOGGER.info("[VillagerPickup-Verbose] Action: Releasing Trapped Villager against another Villager.");
-                
                 SpawnReason reason = SpawnReason.SPAWNER;
                 try { reason = SpawnReason.valueOf("SPAWN_EGG"); } catch (Exception ignored) {}
                 
@@ -184,17 +161,13 @@ public class VillagerPickup implements ModInitializer {
                 
                 var spawned = EntityType.VILLAGER.spawnFromItemStack((ServerWorld) world, stackToSpawn, player, villager.getBlockPos(), reason, true, false);
                 if (spawned != null) {
-                    LOGGER.info("[VillagerPickup-Verbose] Result: Successfully released TRAPPED villager.");
                     if (!player.getAbilities().creativeMode) {
                         stack.decrement(1);
                     }
                     return ActionResult.SUCCESS;
-                } else {
-                    LOGGER.warn("[VillagerPickup-Verbose] Result: Failed to spawn TRAPPED villager!");
                 }
             }
 
-            LOGGER.info("[VillagerPickup-Verbose] Action: No custom logic applied (Pass to Vanilla).");
             return ActionResult.PASS;
         });
 
@@ -204,9 +177,6 @@ public class VillagerPickup implements ModInitializer {
 
             ItemStack stack = player.getStackInHand(hand);
             if (isTrapped(stack)) {
-                LOGGER.info("[VillagerPickup-Verbose] --- UseBlockCallback Triggered ---");
-                LOGGER.info("[VillagerPickup-Verbose] Action: Releasing Trapped Villager on open Space (Block: {}).", hitResult.getBlockPos());
-                
                 if (world instanceof ServerWorld serverWorld) {
                     SpawnReason reason = SpawnReason.SPAWNER;
                     try { reason = SpawnReason.valueOf("SPAWN_EGG"); } catch (Exception ignored) {}
