@@ -1,0 +1,27 @@
+﻿{
+  "schemaVersion": 1,
+  "id": "villager_pickup",
+  "version": "${version}",
+  "name": "Villager Pickup",
+  "description": "Allows players to pick up villagers by shift-right-clicking them.",
+  "authors": [
+    "Fayber"
+  ],
+  "contact": {
+    "homepage": "https://fabricmc.net/"
+  },
+  "license": "GPL-3.0-or-later",
+  "icon": "assets/villager_pickup/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.fayber.villagerpickup.VillagerPickup"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
