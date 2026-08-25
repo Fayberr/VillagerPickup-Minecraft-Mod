@@ -1,6 +1,7 @@
 package net.fayber.villagerpickup;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.ChatFormatting;
@@ -61,7 +62,11 @@ public class VillagerPickup implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Villager Pickup v4.6.0 Initialized!");
+        String version = FabricLoader.getInstance()
+                .getModContainer("villager_pickup")
+                .map(c -> c.getMetadata().getVersion().getFriendlyString())
+                .orElse("unknown");
+        LOGGER.info("Villager Pickup v{} Initialized!", version);
 
         UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
             if (player.isSpectator()) return InteractionResult.PASS;
