@@ -8,6 +8,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -60,6 +61,13 @@ public class VillagerPickup implements ModInitializer {
         return reason;
     }
 
+    /** 26.2 removed the EntityType.* constants; look the villager type up. */
+    @SuppressWarnings("unchecked")
+    private static EntityType<Villager> villagerType() {
+        return (EntityType<Villager>) BuiltInRegistries.ENTITY_TYPE.getValue(
+                Identifier.fromNamespaceAndPath("minecraft", "villager"));
+    }
+
     @Override
     public void onInitialize() {
         String version = FabricLoader.getInstance()
@@ -103,7 +111,7 @@ public class VillagerPickup implements ModInitializer {
                     nbt.remove("Dimension");
                     nbt.putBoolean("VillagerPickupMarker", true);
 
-                    egg.set(DataComponents.ENTITY_DATA, TypedEntityData.of((EntityType<?>) EntityType.VILLAGER, nbt));
+                    egg.set(DataComponents.ENTITY_DATA, TypedEntityData.of(villagerType(), nbt));
 
                     List<Component> loreLines = new ArrayList<>();
                     VillagerData vData = villager.getVillagerData();
@@ -179,7 +187,7 @@ public class VillagerPickup implements ModInitializer {
                 ItemStack stackToSpawn = stack.copy();
                 stackToSpawn.remove(DataComponents.CUSTOM_NAME);
 
-                Villager spawned = EntityType.VILLAGER.spawn((ServerLevel) world, stackToSpawn, player, villager.blockPosition(), spawnReason(), true, false);
+                Villager spawned = villagerType().spawn((ServerLevel) world, stackToSpawn, player, villager.blockPosition(), spawnReason(), true, false);
                 if (spawned != null) {
                     if (!player.getAbilities().instabuild) {
                         stack.shrink(1);
@@ -202,7 +210,7 @@ public class VillagerPickup implements ModInitializer {
                     stackToSpawn.remove(DataComponents.CUSTOM_NAME);
 
                     BlockPos spawnPos = ((BlockHitResult) hitResult).getBlockPos().relative(((BlockHitResult) hitResult).getDirection());
-                    Villager spawned = EntityType.VILLAGER.spawn(serverWorld, stackToSpawn, player, spawnPos, spawnReason(), true, false);
+                    Villager spawned = villagerType().spawn(serverWorld, stackToSpawn, player, spawnPos, spawnReason(), true, false);
                     if (spawned != null) {
                         if (!player.getAbilities().instabuild) {
                             stack.shrink(1);
