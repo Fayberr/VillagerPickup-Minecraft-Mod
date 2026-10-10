@@ -170,7 +170,7 @@ public class VillagerPickup implements ModInitializer {
                     egg.set(DataComponents.LORE, new ItemLore(loreLines));
 
                     if (!player.getInventory().add(egg)) {
-                        player.drop(egg, false, false);
+                        player.drop(egg, false, net.minecraft.util.Prediction.SERVER_ONLY);
                     }
 
                     villager.discard();
